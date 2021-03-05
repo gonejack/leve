@@ -3,14 +3,15 @@ package cmd
 import (
 	"bufio"
 	"encoding/json"
-	"github.com/antonfisher/nested-logrus-formatter"
-	"github.com/mmcdole/gofeed"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 	"io/ioutil"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/antonfisher/nested-logrus-formatter"
+	"github.com/mmcdole/gofeed"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 var (

@@ -4,16 +4,19 @@ import (
 	"context"
 	"crypto/md5"
 	"fmt"
-	"github.com/mmcdole/gofeed"
-	"github.com/schollz/progressbar/v3"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
+
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/dustin/go-humanize"
+	"github.com/mmcdole/gofeed"
+	"github.com/schollz/progressbar/v3"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 )
 
 var dlLock = semaphore.NewWeighted(5)
@@ -85,6 +88,11 @@ func download(file *os.File, imageRef string) (err error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return fmt.Errorf("response status code %d invalid", resp.StatusCode)
+	}
+
+	var written int64
 	if flagVerbose {
 		bar := progressbar.NewOptions64(resp.ContentLength,
 			progressbar.OptionSetTheme(progressbar.Theme{Saucer: "=", SaucerPadding: ".", BarStart: "|", BarEnd: "|"}),
@@ -98,9 +106,13 @@ func download(file *os.File, imageRef string) (err error) {
 			progressbar.OptionClearOnFinish(),
 		)
 		defer bar.Clear()
-		_, err = io.Copy(io.MultiWriter(file, bar), resp.Body)
+		written, err = io.Copy(io.MultiWriter(file, bar), resp.Body)
 	} else {
-		_, err = io.Copy(file, resp.Body)
+		written, err = io.Copy(file, resp.Body)
+	}
+
+	if err == nil && written < resp.ContentLength {
+		err = fmt.Errorf("expected %s but downloaded %s", humanize.Bytes(uint64(resp.ContentLength)), humanize.Bytes(uint64(written)))
 	}
 
 	return

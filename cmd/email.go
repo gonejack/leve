@@ -6,6 +6,7 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
@@ -34,10 +35,11 @@ func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, 
 		}
 
 		attach.HTMLRelated = true
-		replaces = append(replaces, src, fmt.Sprintf("cid:%s", contentId))
+		replaces = append(replaces, fmt.Sprintf(` src="%s"`, src), fmt.Sprintf(` src="cid:%s"`, contentId))
 	}
 	replacer := strings.NewReplacer(replaces...)
-	html := replacer.Replace(article.Content)
+	html := cleanHTML(article.Content)
+	html = replacer.Replace(html)
 	html = html + footer(article.Link)
 
 	eml.Subject = article.Title
@@ -48,22 +50,35 @@ func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, 
 		return
 	}
 
-	filename = fmt.Sprintf("%s.eml", escapeFilename(article.Title))
+	extension := "eml"
+	basename := escapeFileName(article.Title)
+	filename = fmt.Sprintf("%s.%s", basename, extension)
+	for i := 1; fileExists(filename); i++ {
+		filename = fmt.Sprintf("%s#%d.%s", basename, i, extension)
+	}
 	err = ioutil.WriteFile(filename, data, 0666)
 
 	return
 }
 
+var filenameEscape = strings.NewReplacer(
+	"/", "#slash",
+)
+
+func escapeFileName(name string) string {
+	return filenameEscape.Replace(name)
+}
 func generateContentID() string {
 	return strings.ToUpper(uuid.New().String())
 }
 
-var replacer = strings.NewReplacer(
-	"/", "#slash",
-)
+var srcsetRegExp = regexp.MustCompile(` srcset="[^"]*?"`)
+var loadingRegExp = regexp.MustCompile(` loading="[^"]*?"`)
 
-func escapeFilename(name string) string {
-	return replacer.Replace(name)
+func cleanHTML(html string) (cleaned string) {
+	cleaned = srcsetRegExp.ReplaceAllLiteralString(html, "")
+	cleaned = loadingRegExp.ReplaceAllLiteralString(cleaned, "")
+	return
 }
 
 var footerTPL = `<br><br><br>

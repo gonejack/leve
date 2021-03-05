@@ -1,10 +1,11 @@
 package cmd
 
 import (
-	"github.com/jordan-wright/email"
-	"github.com/sirupsen/logrus"
 	"net/smtp"
 	"os"
+
+	"github.com/jordan-wright/email"
+	"github.com/sirupsen/logrus"
 )
 
 func sendAndRemove(emails []string) {
