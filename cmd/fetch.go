@@ -125,10 +125,6 @@ func download(path string, src string, log *logrus.Entry) (err error) {
 	return
 }
 
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return !os.IsNotExist(err)
-}
 func md5str(s string) string {
 	return fmt.Sprintf("%x", md5.Sum([]byte(s)))
 }
