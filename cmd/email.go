@@ -13,18 +13,18 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
-func saveEmail(item *gofeed.Item, downloads map[string]string) (filename string, err error) {
-	e := email.NewEmail()
+func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, err error) {
+	eml := email.NewEmail()
 
 	var replaces []string
-	for src, fpath := range downloads {
-		f, err := os.Open(fpath)
+	for src, path := range saves {
+		file, err := os.Open(path)
 		if err != nil {
 			return "", err
 		}
 
 		contentId := generateContentID()
-		a, e := e.Attach(f, contentId, mime.TypeByExtension(filepath.Ext(src)))
+		a, e := eml.Attach(file, contentId, mime.TypeByExtension(filepath.Ext(src)))
 		if e != nil {
 			return "", e
 		}
@@ -33,17 +33,18 @@ func saveEmail(item *gofeed.Item, downloads map[string]string) (filename string,
 		replaces = append(replaces, src, fmt.Sprintf("cid:%s", contentId))
 	}
 	replacer := strings.NewReplacer(replaces...)
+	html := replacer.Replace(article.Content)
 
-	e.Subject = item.Title
-	e.HTML = []byte(replacer.Replace(item.Content))
+	eml.Subject = article.Title
+	eml.HTML = []byte(html)
 
-	bytes, err := e.Bytes()
+	data, err := eml.Bytes()
 	if err != nil {
 		return
 	}
 
-	filename = fmt.Sprintf("%s.eml", item.Title)
-	err = ioutil.WriteFile(filename, bytes, 0666)
+	filename = fmt.Sprintf("%s.eml", article.Title)
+	err = ioutil.WriteFile(filename, data, 0666)
 
 	return
 }

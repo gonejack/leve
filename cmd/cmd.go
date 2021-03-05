@@ -20,13 +20,14 @@ var (
 
 	currState = make(map[string]int64)
 	prevState = make(map[string]int64)
-	send      Send
 
 	flagVerbose = false
 	flagSend    = false
 
 	argFrom *string
 	argTo   *string
+
+	send Send
 
 	command = &cobra.Command{
 		Use:   "leve",
@@ -159,15 +160,15 @@ func process(feed *gofeed.Feed) (emails []string, err error) {
 		log := log.WithField("article", article.Title)
 
 		log.Debugf("fetch")
-		resources, err := fetchResources(feed, article)
+		saves, err := fetchResources(feed, article)
 		if err != nil {
-			log.WithError(err).Errorf("fetch images failed")
+			log.WithError(err).Errorf("fetch resource failed")
 			return nil, err
 		}
 		log.Debugf("fetched")
 
 		log.Debugf("save")
-		email, err := saveEmail(article, resources)
+		email, err := saveEmail(article, saves)
 		if err != nil {
 			log.WithError(err).Error("save email failed")
 			continue
