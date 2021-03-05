@@ -102,7 +102,7 @@ func run(c *cobra.Command, args []string) {
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			feed := strings.TrimSpace(scanner.Text())
-			if feed == "" {
+			if feed == "" || strings.HasPrefix(feed, "//") {
 				continue
 			}
 
@@ -121,7 +121,7 @@ func run(c *cobra.Command, args []string) {
 	for feed := range prevState {
 		_, exist := currState[feed]
 		if !exist {
-			logrus.Info("removed %s", feed)
+			logrus.Infof("removed %s", feed)
 		}
 	}
 

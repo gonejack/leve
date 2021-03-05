@@ -10,4 +10,5 @@ require (
 	github.com/schollz/progressbar/v3 v3.7.4
 	github.com/sirupsen/logrus v1.2.0
 	github.com/spf13/cobra v1.1.1
+	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 )

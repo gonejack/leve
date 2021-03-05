@@ -2,12 +2,12 @@ package cmd
 
 import "regexp"
 
-var srcRegexp = regexp.MustCompile(`src="(http[^"]+)"`)
+var imgRegExp = regexp.MustCompile(`<img\s[^>]*?src="(http[^"]+)"`)
 
 func parseSources(html string) (list []string) {
 	unique := map[string]struct{}{}
 
-	matches := srcRegexp.FindAllStringSubmatch(html, -1)
+	matches := imgRegExp.FindAllStringSubmatch(html, -1)
 	for _, match := range matches {
 		if len(match) < 2 {
 			continue

@@ -5,12 +5,15 @@ import (
 	"github.com/mmcdole/gofeed"
 	"github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/semaphore"
 	"io"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 )
 
+var weighted = semaphore.NewWeighted(5)
 var client = http.Client{}
 
 func fetchFeed(url string) (*gofeed.Feed, error) {
@@ -24,34 +27,43 @@ func fetchResources(feed *gofeed.Feed, article *gofeed.Item) (map[string]string,
 		"article": article.Title,
 	})
 
+	var wg sync.WaitGroup
 	saves := make(map[string]string)
 	srcList := parseSources(article.Content)
+
+	log.Debugf("download start")
 	for _, src := range srcList {
 		log := log.WithField("source", src)
-
-		log.Debugf("download start")
 		fp, err := os.CreateTemp("", "level-")
 		if err != nil {
 			logrus.WithError(err).Fatal("cannot create tempfile")
 			return nil, err
 		}
-		log.Debugf("download create %s", fp.Name())
-		err = download(fp, src)
-		if err != nil {
-			log.WithError(err).Error("download failed")
-			continue
-		}
-		log.Debugf("download success %s", fp.Name())
+		log.Debugf("open file %s", fp.Name())
 
 		saves[src] = fp.Name()
+
+		wg.Add(1)
+		go func(fp *os.File, log *logrus.Entry) {
+			weighted.Acquire(context.TODO(), 1)
+			defer fp.Close()
+			defer wg.Done()
+			defer weighted.Release(1)
+
+			err = download(fp, src)
+			if err != nil {
+				log.WithError(err).Error("download failed")
+			}
+		}(fp, log)
 	}
+	wg.Wait()
+
+	log.Debugf("download finish")
 
 	return saves, nil
 }
 
 func download(file *os.File, imageRef string) (err error) {
-	defer file.Close()
-
 	timeout, cancel := timeout(time.Minute * 2)
 	defer cancel()
 
@@ -78,6 +90,7 @@ func download(file *os.File, imageRef string) (err error) {
 			progressbar.OptionSetRenderBlankState(true),
 			progressbar.OptionClearOnFinish(),
 		)
+		defer bar.Clear()
 		_, err = io.Copy(io.MultiWriter(file, bar), resp.Body)
 	} else {
 		_, err = io.Copy(file, resp.Body)
