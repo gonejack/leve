@@ -38,13 +38,14 @@ func fetchArticle(article *gofeed.Item) (map[string]string, error) {
 
 		target := filepath.Join(tempDir, fmt.Sprintf("%s%s", md5str(src), filepath.Ext(src)))
 		saves[src] = target
+
 		if fileExists(target) {
 			continue
 		}
 
 		file, err := os.OpenFile(target, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
-			logrus.WithError(err).Fatal("cannot create tempfile")
+			logrus.WithError(err).Fatal("cannot create temp file")
 			return nil, err
 		}
 		log.Debugf("open file %s", file.Name())
@@ -119,11 +120,11 @@ func download(file *os.File, imageRef string) (err error) {
 }
 
 func fileExists(path string) bool {
-	_, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL, 0666)
-	if os.IsExist(err) {
-		return true
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false
 	}
-	return false
+	return true
 }
 func md5str(s string) string {
 	return fmt.Sprintf("%x", md5.Sum([]byte(s)))
