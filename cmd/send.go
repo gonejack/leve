@@ -8,18 +8,18 @@ import (
 )
 
 func sendAndRemove(emails []string) {
-	for _, email := range emails {
-		log := logrus.WithField("email", email)
+	for _, eml := range emails {
+		log := logrus.WithField("email", eml)
 
-		log.Debugf("send")
-		err := sendEmail(email)
+		log.Debugf("email send")
+		err := sendEmail(eml)
 		if err != nil {
 			log.WithError(err).Errorf("send failed")
 			continue
 		}
-		log.Info("sent")
+		log.Info("email sent")
 
-		_ = os.Remove(email)
+		_ = os.Remove(eml)
 	}
 }
 

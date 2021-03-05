@@ -128,14 +128,14 @@ func run(c *cobra.Command, args []string) {
 	for feed := range currState {
 		log := logrus.WithField("feed", feed)
 
-		log.Debugf("fetch")
+		log.Debugf("feed fetch")
 		fd, err := fetchFeed(feed)
 		if err != nil {
 			log.WithError(err).Errorf("fetch failed")
 			continue
 		}
 
-		log.Debugf("process")
+		log.Debugf("feed process")
 		emails, err := process(fd)
 		if err != nil {
 			logrus.WithError(err).Errorf("process feed %s error", feed)
@@ -159,22 +159,22 @@ func process(feed *gofeed.Feed) (emails []string, err error) {
 	for _, article := range feed.Items {
 		log := log.WithField("article", article.Title)
 
-		log.Debugf("fetch")
+		log.Debugf("article fetch")
 		saves, err := fetchResources(feed, article)
 		if err != nil {
 			log.WithError(err).Errorf("fetch resource failed")
 			return nil, err
 		}
-		log.Debugf("fetched")
+		log.Debugf("article fetched")
 
-		log.Debugf("save")
+		log.Debugf("email save")
 		email, err := saveEmail(article, saves)
 		if err != nil {
 			log.WithError(err).Error("save email failed")
 			continue
 		}
 		emails = append(emails, email)
-		log.Info("saved")
+		log.Infof("email saved %s", email)
 	}
 
 	return

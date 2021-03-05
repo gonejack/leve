@@ -29,19 +29,19 @@ func fetchResources(feed *gofeed.Feed, article *gofeed.Item) (map[string]string,
 	for _, src := range srcList {
 		log := log.WithField("source", src)
 
-		log.Debugf("start download")
+		log.Debugf("download start")
 		fp, err := os.CreateTemp("", "level-")
 		if err != nil {
 			logrus.WithError(err).Fatal("cannot create tempfile")
 			return nil, err
 		}
-		log.Debugf("create %s", fp.Name())
+		log.Debugf("download create %s", fp.Name())
 		err = download(fp, src)
 		if err != nil {
 			log.WithError(err).Error("download failed")
 			continue
 		}
-		log.Debugf("downloaded %s", fp.Name())
+		log.Debugf("download success %s", fp.Name())
 
 		saves[src] = fp.Name()
 	}
