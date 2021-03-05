@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/md5"
 	"fmt"
-
 	"io"
 	"net/http"
 	"os"
@@ -34,35 +33,22 @@ func fetchArticle(article *gofeed.Item) (map[string]string, error) {
 
 	var group errgroup.Group
 	for _, src := range parseSources(article.Content) {
-		log := logrus.WithField("source", src)
-
 		target := filepath.Join(tempDir, fmt.Sprintf("%s%s", md5str(src), filepath.Ext(src)))
+
 		saves[src] = target
 
-		if fileExists(target) {
-			continue
-		}
-
-		file, err := os.OpenFile(target, os.O_RDWR|os.O_CREATE, 0666)
-		if err != nil {
-			logrus.WithError(err).Fatal("cannot create temp file")
-			return nil, err
-		}
-		log.Debugf("open file %s", file.Name())
-
-		func(src string, file *os.File, log *logrus.Entry) {
+		func(src string, file string, log *logrus.Entry) {
 			group.Go(func() error {
 				dlLock.Acquire(context.TODO(), 1)
-				defer file.Close()
 				defer dlLock.Release(1)
 
-				err := download(file, src)
+				err := download(file, src, log)
 				if err != nil {
 					log.WithError(err).Error("download failed")
 				}
 				return err
 			})
-		}(src, file, log)
+		}(src, target, logrus.WithField("source", src))
 	}
 
 	err := group.Wait()
@@ -74,15 +60,27 @@ func fetchArticle(article *gofeed.Item) (map[string]string, error) {
 	}
 }
 
-func download(file *os.File, imageRef string) (err error) {
+func download(path string, src string, log *logrus.Entry) (err error) {
 	timeout, cancel := timeout(time.Minute * 2)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(timeout, http.MethodGet, imageRef, nil)
+	info, err := os.Stat(path)
+	if err == nil {
+		headReq, headErr := http.NewRequestWithContext(timeout, http.MethodHead, src, nil)
+		if headErr != nil {
+			return headErr
+		}
+		resp, headErr := client.Do(headReq)
+		if headErr == nil && info.Size() == resp.ContentLength {
+			log.Debugf("use cache %s", path)
+			return // skip download
+		}
+	}
+
+	req, err := http.NewRequestWithContext(timeout, http.MethodGet, src, nil)
 	if err != nil {
 		return
 	}
-
 	resp, err := client.Do(req)
 	if err != nil {
 		return
@@ -93,6 +91,14 @@ func download(file *os.File, imageRef string) (err error) {
 		return fmt.Errorf("response status code %d invalid", resp.StatusCode)
 	}
 
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	if err != nil {
+		log.WithError(err).Fatal("cannot create temp file")
+		return
+	}
+	defer file.Close()
+	log.Debugf("open file %s", file.Name())
+
 	var written int64
 	if flagVerbose {
 		bar := progressbar.NewOptions64(resp.ContentLength,
@@ -102,7 +108,7 @@ func download(file *os.File, imageRef string) (err error) {
 			progressbar.OptionShowBytes(true),
 			progressbar.OptionShowCount(),
 			progressbar.OptionSetPredictTime(false),
-			progressbar.OptionSetDescription(filepath.Base(imageRef)),
+			progressbar.OptionSetDescription(filepath.Base(src)),
 			progressbar.OptionSetRenderBlankState(true),
 			progressbar.OptionClearOnFinish(),
 		)

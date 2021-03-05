@@ -1,3 +1,6 @@
 /.idea
 /bin
 /var
+/temp
+/*.eml
+/*.json

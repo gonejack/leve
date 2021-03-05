@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"mime"
 	"os"
 	"path/filepath"
@@ -28,7 +27,6 @@ func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, 
 		attach, attachErr := eml.Attach(file, contentId, mime.TypeByExtension(filepath.Ext(src)))
 
 		_ = file.Close()
-		_ = os.Remove(localFile)
 
 		if attachErr != nil {
 			return "", attachErr
@@ -53,10 +51,25 @@ func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, 
 	extension := "eml"
 	basename := escapeFileName(article.Title)
 	filename = fmt.Sprintf("%s.%s", basename, extension)
-	for i := 1; fileExists(filename); i++ {
-		filename = fmt.Sprintf("%s#%d.%s", basename, i, extension)
+
+	var file *os.File
+	var inc = 1
+	for {
+		file, err = os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
+		if err == nil {
+			break
+		}
+		if os.IsExist(err) {
+			filename = fmt.Sprintf("%s#%d.%s", basename, inc, extension)
+			inc++
+			continue
+		} else {
+			return
+		}
 	}
-	err = ioutil.WriteFile(filename, data, 0666)
+	defer file.Close()
+
+	_, err = file.Write(data)
 
 	return
 }
