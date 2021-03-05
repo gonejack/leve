@@ -121,10 +121,7 @@ func download(file *os.File, imageRef string) (err error) {
 
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return true
+	return !os.IsNotExist(err)
 }
 func md5str(s string) string {
 	return fmt.Sprintf("%x", md5.Sum([]byte(s)))
