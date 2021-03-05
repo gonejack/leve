@@ -43,7 +43,7 @@ func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, 
 		return
 	}
 
-	filename = fmt.Sprintf("%s.eml", article.Title)
+	filename = fmt.Sprintf("%s.eml", escapeFilename(article.Title))
 	err = ioutil.WriteFile(filename, data, 0666)
 
 	return
@@ -51,4 +51,12 @@ func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, 
 
 func generateContentID() string {
 	return strings.ToUpper(uuid.New().String())
+}
+
+var replacer = strings.NewReplacer(
+	"/", "#slash",
+)
+
+func escapeFilename(name string) string {
+	return replacer.Replace(name)
 }
