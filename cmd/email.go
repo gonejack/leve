@@ -17,19 +17,23 @@ func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, 
 	eml := email.NewEmail()
 
 	var replaces []string
-	for src, path := range saves {
-		file, err := os.Open(path)
+	for src, localFile := range saves {
+		file, err := os.Open(localFile)
 		if err != nil {
 			return "", err
 		}
 
 		contentId := generateContentID()
-		a, e := eml.Attach(file, contentId, mime.TypeByExtension(filepath.Ext(src)))
-		if e != nil {
-			return "", e
+		attach, attachErr := eml.Attach(file, contentId, mime.TypeByExtension(filepath.Ext(src)))
+
+		_ = file.Close()
+		_ = os.Remove(localFile)
+
+		if attachErr != nil {
+			return "", attachErr
 		}
 
-		a.HTMLRelated = true
+		attach.HTMLRelated = true
 		replaces = append(replaces, src, fmt.Sprintf("cid:%s", contentId))
 	}
 	replacer := strings.NewReplacer(replaces...)

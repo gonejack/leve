@@ -14,6 +14,7 @@ import (
 )
 
 var (
+	tempDir    = "temp"
 	feedsFile  = "feeds.txt"
 	stateFile  = "state.json"
 	serverFile = "send.json"
@@ -76,6 +77,12 @@ func run(c *cobra.Command, args []string) {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
+	err := os.MkdirAll(tempDir, 0777)
+	if err != nil {
+		logrus.WithError(err).Fatalf("can not create temp directory")
+		return
+	}
+
 	// parse send
 	bytes, err := ioutil.ReadFile(serverFile)
 	if err == nil && len(bytes) > 0 {
@@ -113,6 +120,7 @@ func run(c *cobra.Command, args []string) {
 			currState[feed] = checkTime
 		}
 		err = scanner.Err()
+		_ = file.Close()
 	}
 	if err != nil {
 		logrus.WithError(err).Fatalf("parse %s failed", feedsFile)
@@ -151,16 +159,23 @@ func run(c *cobra.Command, args []string) {
 	}
 
 	bytes, _ = json.Marshal(currState)
-	ioutil.WriteFile(stateFile, bytes, 0666)
+	ioutil.WriteFile(stateFile, bytes, 0777)
+
+	if isDirEmpty(tempDir) {
+		os.Remove(tempDir)
+	}
 }
 func process(feed *gofeed.Feed) (emails []string, err error) {
 	log := logrus.WithField("feed", feed.Title)
 
 	for _, article := range feed.Items {
-		log := log.WithField("article", article.Title)
+		log := log.WithFields(logrus.Fields{
+			"feed":    feed.Title,
+			"article": article.Title,
+		})
 
 		log.Debugf("article fetch")
-		saves, err := fetchResources(feed, article)
+		saves, err := fetchArticle(article)
 		if err != nil {
 			log.WithError(err).Errorf("fetch resource failed")
 			return nil, err

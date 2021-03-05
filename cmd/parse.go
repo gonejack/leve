@@ -5,18 +5,17 @@ import "regexp"
 var imgRegExp = regexp.MustCompile(`<img\s[^>]*?src="(http[^"]+)"`)
 
 func parseSources(html string) (list []string) {
-	unique := map[string]struct{}{}
-
+	unique := make(map[string]struct{})
 	matches := imgRegExp.FindAllStringSubmatch(html, -1)
 	for _, match := range matches {
 		if len(match) < 2 {
 			continue
 		}
-		u := match[1]
-		_, exist := unique[u]
+		link := match[1]
+		_, exist := unique[link]
 		if !exist {
-			list = append(list, u)
-			unique[u] = struct{}{}
+			list = append(list, link)
+			unique[link] = struct{}{}
 		}
 	}
 

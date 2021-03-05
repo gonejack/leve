@@ -28,6 +28,7 @@ func sendEmail(eml string) (err error) {
 	if err != nil {
 		return
 	}
+	defer file.Close()
 
 	e, err := email.NewEmailFromReader(file)
 	if err != nil {
