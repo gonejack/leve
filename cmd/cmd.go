@@ -1,73 +1,108 @@
 package cmd
 
 import (
-	"fmt"
-	"github.com/spf13/cobra"
+	"bufio"
+	"encoding/json"
+	"io/ioutil"
 	"os"
+	"strings"
+	"time"
+
+	"github.com/antonfisher/nested-logrus-formatter"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
-var processAttachments, useGitDates, verbose bool
-var toAppend string
+var (
+	feedsFile = "feeds.txt"
+	stateFile = "state.json"
+
+	parsedFeeds = make(map[string]int64)
+	parsedState = make(map[string]int64)
+
+	verbose = false
+
+	command = &cobra.Command{
+		Use:   "leve [file] [file2] [file3]...",
+		Short: "Convert RSS to email",
+		Run:   Run,
+	}
+)
 
 func init() {
-	RootCmd.PersistentFlags().BoolVarP(
-		&processAttachments,
-		"process-attachments",
-		"p",
-		false,
-		"Replace links to local files with Bear-compatible tags to ease processing",
-	)
-	RootCmd.PersistentFlags().BoolVarP(
-		&useGitDates,
-		"git-dates",
-		"g",
-		false,
-		"Instead of using OS creation / modification dates of Markdown file, use the dates from git commit history (must be in a git repo & have git CLI)",
-	)
-	RootCmd.PersistentFlags().StringVarP(
-		&toAppend,
-		"append",
-		"a",
-		"",
-		"Text to append to end of Markdown file. Use %f to template the original filename.",
-	)
-	RootCmd.PersistentFlags().BoolVarP(
+	command.PersistentFlags().BoolVarP(
 		&verbose,
 		"verbose",
 		"v",
 		false,
 		"Verbose",
 	)
+	logrus.SetFormatter(&formatter.Formatter{
+		TimestampFormat: "2006-01-02 15:04:05",
+		//NoColors:        true,
+		HideKeys:    true,
+		CallerFirst: true,
+		FieldsOrder: []string{"feed", "article", "source"},
+	})
 }
 
-// RootCmd handles the base case for textbundler: processing Markdown files.
-var RootCmd = &cobra.Command{
-	Use:   "textbundler [file] [file2] [file3]...",
-	Short: "Convert markdown files into textbundles",
-	Run: func(md *cobra.Command, args []string) {
-		if len(args) == 0 {
-			fmt.Fprintln(os.Stderr, "Please pass at least one argument.")
-			os.Exit(1)
-		}
+func Run(md *cobra.Command, args []string) {
+	if verbose {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
 
-		for _, file := range args {
-			if err := process(file); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(1)
+	// parse state
+	bytes, err := ioutil.ReadFile(stateFile)
+	if err == nil && len(bytes) > 0 {
+		err = json.Unmarshal(bytes, &parsedState)
+		if err != nil {
+			logrus.WithError(err).Fatalf("parse %s failed", stateFile)
+			return
+		}
+	}
+
+	// parse feeds
+	fp, err := os.Open(feedsFile)
+	if err == nil {
+		scanner := bufio.NewScanner(fp)
+		for scanner.Scan() {
+			feed := strings.TrimSpace(scanner.Text())
+			if feed == "" {
+				continue
 			}
+
+			ts, exist := parsedState[feed]
+			if !exist {
+				logrus.Debugf("add new feed %s", feed)
+			}
+			parsedFeeds[feed] = ts
 		}
-	},
+		err = scanner.Err()
+	}
+	if err != nil {
+		logrus.WithError(err).Fatalf("parse %s failed", feedsFile)
+	}
+
+	for feed := range parsedState {
+		_, exist := parsedFeeds[feed]
+		if !exist {
+			logrus.Debugf("remove feed %s", feed)
+		}
+	}
+
+	for feed := range parsedFeeds {
+		err := process(feed)
+		if err == nil {
+			parsedFeeds[feed] = time.Now().Unix()
+		} else {
+			logrus.WithError(err).Errorf("process feed %s error", feed)
+		}
+	}
 }
 
-func process(file string) error {
-
-	return nil
-}
-
-// Execute begins the CLI processing flow
 func Execute() {
-	if err := RootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	err := command.Execute()
+	if err != nil {
+		logrus.Fatal(err)
 	}
 }
