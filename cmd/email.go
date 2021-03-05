@@ -13,20 +13,20 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
-func packEmail(item *gofeed.Item, downloads map[string]string) (err error) {
+func saveEmail(item *gofeed.Item, downloads map[string]string) (filename string, err error) {
 	e := email.NewEmail()
 
 	var replaces []string
 	for src, fpath := range downloads {
 		f, err := os.Open(fpath)
 		if err != nil {
-			return err
+			return "", err
 		}
 
-		contentId := newContentId()
+		contentId := generateContentID()
 		a, e := e.Attach(f, contentId, mime.TypeByExtension(filepath.Ext(src)))
 		if e != nil {
-			return e
+			return "", e
 		}
 
 		a.HTMLRelated = true
@@ -34,9 +34,6 @@ func packEmail(item *gofeed.Item, downloads map[string]string) (err error) {
 	}
 	replacer := strings.NewReplacer(replaces...)
 
-	e.To = []string{"youi.note@qq.com"}
-	e.From = "youi.note@qq.com"
-	e.Sender = "youi.note"
 	e.Subject = item.Title
 	e.HTML = []byte(replacer.Replace(item.Content))
 
@@ -45,9 +42,12 @@ func packEmail(item *gofeed.Item, downloads map[string]string) (err error) {
 		return
 	}
 
-	return ioutil.WriteFile(fmt.Sprintf("%s.eml", item.Title), bytes, 0666)
+	filename = fmt.Sprintf("%s.eml", item.Title)
+	err = ioutil.WriteFile(filename, bytes, 0666)
+
+	return
 }
 
-func newContentId() string {
+func generateContentID() string {
 	return strings.ToUpper(uuid.New().String())
 }

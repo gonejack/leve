@@ -3,35 +3,60 @@ package cmd
 import (
 	"bufio"
 	"encoding/json"
+	"github.com/antonfisher/nested-logrus-formatter"
+	"github.com/mmcdole/gofeed"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 	"io/ioutil"
 	"os"
 	"strings"
 	"time"
-
-	"github.com/antonfisher/nested-logrus-formatter"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 )
 
 var (
-	feedsFile = "feeds.txt"
-	stateFile = "state.json"
+	feedsFile  = "feeds.txt"
+	stateFile  = "state.json"
+	serverFile = "send.json"
 
-	parsedFeeds = make(map[string]int64)
-	parsedState = make(map[string]int64)
+	currState = make(map[string]int64)
+	prevState = make(map[string]int64)
+	send      Send
 
-	verbose = false
+	flagVerbose = false
+	flagSend    = false
+
+	argFrom *string
+	argTo   *string
 
 	command = &cobra.Command{
-		Use:   "leve [file] [file2] [file3]...",
+		Use:   "leve",
 		Short: "Convert RSS to email",
-		Run:   Run,
+		Run:   run,
 	}
 )
 
 func init() {
+	argFrom = command.PersistentFlags().StringP(
+		"from",
+		"f",
+		"",
+		"email from",
+	)
+	argTo = command.PersistentFlags().StringP(
+		"to",
+		"t",
+		"",
+		"email t",
+	)
 	command.PersistentFlags().BoolVarP(
-		&verbose,
+		&flagSend,
+		"send",
+		"s",
+		false,
+		"Send emails",
+	)
+	command.PersistentFlags().BoolVarP(
+		&flagVerbose,
 		"verbose",
 		"v",
 		false,
@@ -45,16 +70,25 @@ func init() {
 		FieldsOrder: []string{"feed", "article", "source"},
 	})
 }
-
-func Run(md *cobra.Command, args []string) {
-	if verbose {
+func run(c *cobra.Command, args []string) {
+	if flagVerbose {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
-	// parse state
-	bytes, err := ioutil.ReadFile(stateFile)
+	// parse send
+	bytes, err := ioutil.ReadFile(serverFile)
 	if err == nil && len(bytes) > 0 {
-		err = json.Unmarshal(bytes, &parsedState)
+		err = json.Unmarshal(bytes, &send)
+		if err != nil {
+			logrus.WithError(err).Fatalf("parse %s failed", serverFile)
+			return
+		}
+	}
+
+	// parse state
+	bytes, err = ioutil.ReadFile(stateFile)
+	if err == nil && len(bytes) > 0 {
+		err = json.Unmarshal(bytes, &prevState)
 		if err != nil {
 			logrus.WithError(err).Fatalf("parse %s failed", stateFile)
 			return
@@ -62,20 +96,20 @@ func Run(md *cobra.Command, args []string) {
 	}
 
 	// parse feeds
-	fp, err := os.Open(feedsFile)
+	file, err := os.Open(feedsFile)
 	if err == nil {
-		scanner := bufio.NewScanner(fp)
+		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			feed := strings.TrimSpace(scanner.Text())
 			if feed == "" {
 				continue
 			}
 
-			ts, exist := parsedState[feed]
+			checkTime, exist := prevState[feed]
 			if !exist {
 				logrus.Debugf("add new feed %s", feed)
 			}
-			parsedFeeds[feed] = ts
+			currState[feed] = checkTime
 		}
 		err = scanner.Err()
 	}
@@ -83,21 +117,66 @@ func Run(md *cobra.Command, args []string) {
 		logrus.WithError(err).Fatalf("parse %s failed", feedsFile)
 	}
 
-	for feed := range parsedState {
-		_, exist := parsedFeeds[feed]
+	for feed := range prevState {
+		_, exist := currState[feed]
 		if !exist {
-			logrus.Debugf("remove feed %s", feed)
+			logrus.Info("removed %s", feed)
 		}
 	}
 
-	for feed := range parsedFeeds {
-		err := process(feed)
-		if err == nil {
-			parsedFeeds[feed] = time.Now().Unix()
-		} else {
+	for feed := range currState {
+		log := logrus.WithField("feed", feed)
+
+		log.Debugf("fetch")
+		fd, err := fetchFeed(feed)
+		if err != nil {
+			log.WithError(err).Errorf("fetch failed")
+			continue
+		}
+
+		log.Debugf("process")
+		emails, err := process(fd)
+		if err != nil {
 			logrus.WithError(err).Errorf("process feed %s error", feed)
+			continue
+		}
+
+		currState[feed] = time.Now().Unix()
+
+		if flagSend {
+			log.Debugf("send")
+			sendAndRemove(emails)
 		}
 	}
+
+	bytes, _ = json.Marshal(currState)
+	ioutil.WriteFile(stateFile, bytes, 0666)
+}
+func process(feed *gofeed.Feed) (emails []string, err error) {
+	log := logrus.WithField("feed", feed.Title)
+
+	for _, article := range feed.Items {
+		log := log.WithField("article", article.Title)
+
+		log.Debugf("fetch")
+		resources, err := fetchResources(feed, article)
+		if err != nil {
+			log.WithError(err).Errorf("fetch images failed")
+			return nil, err
+		}
+		log.Debugf("fetched")
+
+		log.Debugf("save")
+		email, err := saveEmail(article, resources)
+		if err != nil {
+			log.WithError(err).Error("save email failed")
+			continue
+		}
+		emails = append(emails, email)
+		log.Info("saved")
+	}
+
+	return
 }
 
 func Execute() {
