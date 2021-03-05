@@ -118,18 +118,18 @@ func download(file *os.File, imageRef string) (err error) {
 	return
 }
 
-func fileExists(filename string) bool {
-	_, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
+func fileExists(path string) bool {
+	_, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL, 0666)
+	if os.IsExist(err) {
+		return true
 	}
-	return true
+	return false
 }
 func md5str(s string) string {
 	return fmt.Sprintf("%x", md5.Sum([]byte(s)))
 }
-func isDirEmpty(name string) bool {
-	f, err := os.Open(name)
+func isDirEmpty(path string) bool {
+	f, err := os.Open(path)
 	if err != nil {
 		return false
 	}
