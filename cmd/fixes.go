@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/mmcdole/gofeed"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -24,4 +25,25 @@ func srcFixes(article *gofeed.Item, src string) string {
 	}
 
 	return src
+}
+
+func cleanHTML(html string) (cleaned string) {
+	cleaned = removeImageAttrs(html)
+	cleaned = removeIframe(html)
+	return
+}
+
+var srcsetRegExp = regexp.MustCompile(` srcset="[^"]*?"`)
+var loadingRegExp = regexp.MustCompile(` loading="[^"]*?"`)
+
+func removeImageAttrs(html string) (cleaned string) {
+	cleaned = srcsetRegExp.ReplaceAllLiteralString(html, "")
+	cleaned = loadingRegExp.ReplaceAllLiteralString(cleaned, "")
+	return
+}
+
+var iframeRegExp = regexp.MustCompile(`<iframe.+?src="([^"]+)"[^>]*?>.*?(</iframe>)?`)
+
+func removeIframe(html string) (cleaned string) {
+	return iframeRegExp.ReplaceAllString(html, "<a src=$1>$1</a>")
 }

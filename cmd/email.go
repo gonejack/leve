@@ -5,7 +5,6 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
@@ -83,15 +82,6 @@ func escapeFileName(name string) string {
 }
 func generateContentID() string {
 	return strings.ToUpper(uuid.New().String())
-}
-
-var srcsetRegExp = regexp.MustCompile(` srcset="[^"]*?"`)
-var loadingRegExp = regexp.MustCompile(` loading="[^"]*?"`)
-
-func cleanHTML(html string) (cleaned string) {
-	cleaned = srcsetRegExp.ReplaceAllLiteralString(html, "")
-	cleaned = loadingRegExp.ReplaceAllLiteralString(cleaned, "")
-	return
 }
 
 var footerTPL = `<br><br><br>
