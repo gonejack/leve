@@ -48,7 +48,10 @@ func fetchArticle(article *gofeed.Item) (map[string]string, error) {
 				}
 				return err
 			})
-		}(src, target, logrus.WithField("source", src))
+		}(src, target, logrus.WithFields(logrus.Fields{
+			"source": src,
+			"file":   target,
+		}))
 	}
 
 	err := group.Wait()
@@ -72,7 +75,7 @@ func download(path string, src string, log *logrus.Entry) (err error) {
 		}
 		resp, headErr := client.Do(headReq)
 		if headErr == nil && info.Size() == resp.ContentLength {
-			log.Debugf("use cache %s", path)
+			log.Debugf("use cache")
 			return // skip download
 		}
 	}
@@ -93,11 +96,10 @@ func download(path string, src string, log *logrus.Entry) (err error) {
 
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
-		log.WithError(err).Fatal("cannot create temp file")
+		log.WithError(err).Fatal("cannot open file")
 		return
 	}
 	defer file.Close()
-	log.Debugf("open file %s", file.Name())
 
 	var written int64
 	if flagVerbose {
@@ -127,19 +129,6 @@ func download(path string, src string, log *logrus.Entry) (err error) {
 
 func md5str(s string) string {
 	return fmt.Sprintf("%x", md5.Sum([]byte(s)))
-}
-func isDirEmpty(path string) bool {
-	f, err := os.Open(path)
-	if err != nil {
-		return false
-	}
-	defer f.Close()
-
-	_, err = f.Readdirnames(1)
-	if err == io.EOF {
-		return true
-	}
-	return false
 }
 func timeout(duration time.Duration) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.TODO(), duration)
