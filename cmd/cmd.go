@@ -18,10 +18,11 @@ import (
 
 var (
 	tempDir    = "temp"
-	feedsFile  = "feeds.txt"
 	recordFile = "records.txt"
 	recordSep  = "#record#"
 	recordMax  = 2000
+
+	feedsFile *string
 
 	feedList   []string
 	recordList []string
@@ -30,8 +31,8 @@ var (
 	flagVerbose = false
 
 	cmd = &cobra.Command{
-		Use:   "leve",
-		Short: "Convert RSS to email",
+		Use:   "leve [-f feeds.txt]",
+		Short: "Command line tool to save RSS articles as email.",
 		Run:   run,
 	}
 )
@@ -39,12 +40,18 @@ var (
 func init() {
 	cmd.Flags().SortFlags = false
 	cmd.PersistentFlags().SortFlags = false
+	feedsFile = cmd.PersistentFlags().StringP(
+		"feeds",
+		"f",
+		"feeds.txt",
+		"feeds list file",
+	)
 	cmd.PersistentFlags().BoolVarP(
 		&flagVerbose,
 		"verbose",
 		"v",
 		false,
-		"Verbose",
+		"verbose",
 	)
 	logrus.SetFormatter(&formatter.Formatter{
 		TimestampFormat: "2006-01-02 15:04:05",
@@ -87,7 +94,7 @@ func run(c *cobra.Command, args []string) {
 	}
 
 	// parse feeds
-	file, err = os.Open(feedsFile)
+	file, err = os.Open(*feedsFile)
 	if err == nil {
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
