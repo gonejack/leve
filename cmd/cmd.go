@@ -2,10 +2,8 @@ package cmd
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -22,24 +20,16 @@ var (
 	tempDir    = "temp"
 	feedsFile  = "feeds.txt"
 	recordFile = "records.txt"
-	serverFile = "send.json"
-
-	recordSep = "#record#"
-	recordMax = 2000
+	recordSep  = "#record#"
+	recordMax  = 2000
 
 	feedList   []string
 	recordList []string
 	recordMap  = make(map[string]int)
 
 	flagVerbose = false
-	flagSend    = false
 
-	argFrom *string
-	argTo   *string
-
-	send Send
-
-	command = &cobra.Command{
+	cmd = &cobra.Command{
 		Use:   "leve",
 		Short: "Convert RSS to email",
 		Run:   run,
@@ -47,26 +37,9 @@ var (
 )
 
 func init() {
-	argFrom = command.PersistentFlags().StringP(
-		"from",
-		"f",
-		"",
-		"email from",
-	)
-	argTo = command.PersistentFlags().StringP(
-		"to",
-		"t",
-		"",
-		"email t",
-	)
-	command.PersistentFlags().BoolVarP(
-		&flagSend,
-		"send",
-		"s",
-		false,
-		"Send emails",
-	)
-	command.PersistentFlags().BoolVarP(
+	cmd.Flags().SortFlags = false
+	cmd.PersistentFlags().SortFlags = false
+	cmd.PersistentFlags().BoolVarP(
 		&flagVerbose,
 		"verbose",
 		"v",
@@ -91,15 +64,6 @@ func run(c *cobra.Command, args []string) {
 	if err != nil {
 		logrus.WithError(err).Fatalf("can not create temp directory")
 		return
-	}
-
-	// parse send
-	bytes, err := ioutil.ReadFile(serverFile)
-	if err == nil && len(bytes) > 0 {
-		err = json.Unmarshal(bytes, &send)
-		if err != nil {
-			logrus.WithError(err).Fatalf("parse %s failed", serverFile)
-		}
 	}
 
 	// parse records
@@ -151,15 +115,9 @@ func run(c *cobra.Command, args []string) {
 		}
 
 		log.Debugf("feed process")
-		emails, err := process(fd)
+		_, err = process(fd)
 		if err != nil {
 			logrus.WithError(err).Errorf("process feed %s error", feed)
-			continue
-		}
-
-		if flagSend {
-			log.Debugf("send")
-			sendAndRemove(emails)
 		}
 	}
 
@@ -181,15 +139,15 @@ func run(c *cobra.Command, args []string) {
 		logrus.WithError(err).Fatalf("write %s failed", recordFile)
 	}
 
-	// remove outdated files
+	// remove outdated temp files
 	keepPoint := time.Now().Add(-time.Hour * 24 * 7)
 	filepath.Walk(tempDir, func(path string, info fs.FileInfo, err error) error {
 		outdated := info.ModTime().Before(keepPoint)
 		if outdated {
-			logrus.Debugf("removed outdated file %s", path)
+			logrus.Debugf("removed outdated temp file %s", path)
 			err := os.Remove(path)
 			if err != nil {
-				logrus.WithError(err).Errorf("cannot remove outdated file %s", path)
+				logrus.WithError(err).Errorf("cannot remove outdated temp file %s", path)
 			}
 		}
 		return nil
@@ -244,7 +202,7 @@ func process(feed *gofeed.Feed) (emails []string, err error) {
 }
 
 func Execute() {
-	err := command.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		logrus.Fatal(err)
 	}
