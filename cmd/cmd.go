@@ -168,10 +168,10 @@ func process(feed *gofeed.Feed) (emails []string, err error) {
 		contentLen, exist := recordMap[article.GUID]
 		if exist {
 			if len(article.Content) == contentLen {
-				log.Infof("skipped")
+				log.Debugf("skipped")
 				continue
 			} else {
-				log.Infof("has update")
+				log.Debugf("has update")
 				article.Title += ".update"
 			}
 		}
