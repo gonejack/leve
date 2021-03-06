@@ -37,7 +37,7 @@ func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, 
 	replacer := strings.NewReplacer(replaces...)
 	html := cleanHTML(article.Content)
 	html = replacer.Replace(html)
-	html = html + footer(article.Link)
+	html = html + footer(article)
 
 	eml.Subject = article.Title
 	eml.HTML = []byte(html)
@@ -86,12 +86,15 @@ func generateContentID() string {
 
 var footerTPL = `<br><br><br>
 <a style="display: block; display:inline-block; border-top: 1px solid #ccc; padding-top: 5px; color: #666; text-decoration: none;"
-   href=""${href}"
+   href="${href}"
 >${href}</a>
 <p style="color:#999;">
-    Sent with <a style="color:#666; text-decoration:none; font-weight: bold;" href="https://github.com/gonejack/leve">LEVE</a>
+Sent with <a style="color:#666; text-decoration:none; font-weight: bold;" href="https://github.com/gonejack/leve">LEVE</a>
 </p>`
 
-func footer(link string) string {
-	return strings.ReplaceAll(footerTPL, "${href}", link)
+func footer(article *gofeed.Item) string {
+	return strings.NewReplacer(
+		"${href}", article.Link,
+		"${pub_time}", article.PublishedParsed.Format("2006-01-02 15:04:05"),
+	).Replace(footerTPL)
 }

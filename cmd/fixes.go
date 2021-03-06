@@ -28,8 +28,9 @@ func srcFixes(article *gofeed.Item, src string) string {
 }
 
 func cleanHTML(html string) (cleaned string) {
-	cleaned = removeImageAttrs(html)
-	cleaned = removeIframe(html)
+	cleaned = html
+	cleaned = removeImageAttrs(cleaned)
+	cleaned = removeIframe(cleaned)
 	return
 }
 
