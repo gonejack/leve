@@ -205,6 +205,8 @@ func process(feed *gofeed.Feed) (emails []string, err error) {
 			"guid":    article.GUID,
 		})
 
+		article = articleFixes(article)
+
 		contentLen, exist := recordMap[article.GUID]
 		if exist {
 			if len(article.Content) == contentLen {

@@ -2,7 +2,7 @@ package cmd
 
 import "regexp"
 
-var imgRegExp = regexp.MustCompile(`<img\s[^>]*?src="(http[^"]+)"`)
+var imgRegExp = regexp.MustCompile(`<img\s[^>]*?src="((http|/)[^"]+)"`)
 
 func parseSources(html string) (list []string) {
 	unique := make(map[string]struct{})

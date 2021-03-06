@@ -37,20 +37,21 @@ func fetchArticle(article *gofeed.Item) (map[string]string, error) {
 
 		saves[src] = target
 
-		func(src string, file string, log *logrus.Entry) {
+		link := srcFixes(article, src)
+		func(link string, file string, log *logrus.Entry) {
 			group.Go(func() error {
 				dlLock.Acquire(context.TODO(), 1)
 				defer dlLock.Release(1)
 
-				err := download(file, src, log)
+				err := download(file, link, log)
 				if err != nil {
 					log.WithError(err).Error("download failed")
 				}
 				return err
 			})
-		}(src, target, logrus.WithFields(logrus.Fields{
-			"source": src,
-			"file":   target,
+		}(link, target, logrus.WithFields(logrus.Fields{
+			"link": link,
+			"file": target,
 		}))
 	}
 
