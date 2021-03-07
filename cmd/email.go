@@ -90,7 +90,7 @@ func generateContentID() string {
 	return strings.ToUpper(uuid.New().String())
 }
 
-var footerTPL = `<br><br><br>
+var footerTPL = `<br><br>
 <a style="display: block; display:inline-block; border-top: 1px solid #ccc; padding-top: 5px; color: #666; text-decoration: none;"
    href="${href}"
 >${href}</a>
