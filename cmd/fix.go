@@ -9,7 +9,7 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
-func articleFixes(article *gofeed.Item) *gofeed.Item {
+func fixArticle(article *gofeed.Item) *gofeed.Item {
 	if article.GUID == "" {
 		article.GUID = article.Link
 	}
@@ -19,8 +19,7 @@ func articleFixes(article *gofeed.Item) *gofeed.Item {
 
 	return article
 }
-
-func srcFixes(article *gofeed.Item, src string) string {
+func fixURL(article *gofeed.Item, src string) string {
 	if !strings.HasPrefix(src, "http") {
 		u, err := url.Parse(article.Link)
 		if err == nil {
@@ -31,8 +30,7 @@ func srcFixes(article *gofeed.Item, src string) string {
 
 	return src
 }
-
-func processHTML(html string, footer string, replaces map[string]string) (output string, err error) {
+func fixHTML(html string, replaces map[string]string, footer string) (output string, err error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
 		return

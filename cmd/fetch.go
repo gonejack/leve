@@ -37,7 +37,7 @@ func fetchArticle(article *gofeed.Item) (map[string]string, error) {
 
 		saves[src] = target
 
-		link := srcFixes(article, src)
+		link := fixURL(article, src)
 		func(link string, file string, log *logrus.Entry) {
 			group.Go(func() error {
 				dlLock.Acquire(context.TODO(), 1)
@@ -63,7 +63,6 @@ func fetchArticle(article *gofeed.Item) (map[string]string, error) {
 		return nil, err
 	}
 }
-
 func download(path string, src string, log *logrus.Entry) (err error) {
 	timeout, cancel := timeout(time.Minute * 2)
 	defer cancel()

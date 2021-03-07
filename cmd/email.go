@@ -40,7 +40,7 @@ func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, 
 		replaces[src] = fmt.Sprintf(`cid:%s`, contentId)
 	}
 
-	html, err := processHTML(article.Content, footer(article), replaces)
+	html, err := fixHTML(article.Content, replaces, footer(article))
 	if err != nil {
 		return
 	}

@@ -200,7 +200,7 @@ func process(feed *gofeed.Feed) (emails []string, err error) {
 	log := logrus.WithField("feed", feed.Title)
 
 	for _, article := range feed.Items {
-		article = articleFixes(article)
+		article = fixArticle(article)
 
 		log := log.WithFields(logrus.Fields{
 			"feed":    feed.Title,
