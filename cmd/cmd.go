@@ -34,7 +34,7 @@ var (
 
 	cmd = &cobra.Command{
 		Use:   "leve [-c conf-dir]",
-		Short: "Command line tool to save RSS articles as email.",
+		Short: "Command line tool to save RSS articles as .eml files.",
 		Run:   run,
 	}
 )

@@ -1,21 +1,25 @@
 # LEVE
 
-Command line tool to save RSS articles as email.
+Command line tool to save RSS articles as .eml files.
 
 ### Install
 ```shell
-go get github.com/gonejack/leve
+> go get github.com/gonejack/leve
 ```
 
 ### Config
-Create a `feeds.txt` as lines of feed urls
+Put your feed urls inside `~/.leve/feeds.txt`.
+```shell
+> leve -v
+> vi ~/.leve/feeds.txt
+```
 
 ### Usage
 
 ```shell
-leve [-f feeds.txt]
+> leve [-c ~/.leve]
 ```
 
 ### Files
-- Images would be saved into dir `temp`
-- Article records would be saved into `records.txt`
+- Images would be saved into dir `~/.leve/cache`
+- Article records would be saved into `~/.leve/records.txt`
