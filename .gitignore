@@ -1,8 +1,6 @@
 /.idea
 /bin
 /var
-/sent
-/temp
 /*.eml
 /*.json
 /*.txt
