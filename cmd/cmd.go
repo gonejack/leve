@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -17,12 +18,13 @@ import (
 )
 
 var (
-	tempDir    = "temp"
+	cacheDir   = "cache"
+	feedsFile  = "feeds.txt"
 	recordFile = "records.txt"
 	recordSep  = "#record#"
 	recordMax  = 2000
 
-	feedsFile *string
+	configDir *string // default ~/.leve
 
 	feedList   []string
 	recordList []string
@@ -31,20 +33,27 @@ var (
 	flagVerbose = false
 
 	cmd = &cobra.Command{
-		Use:   "leve [-f feeds.txt]",
+		Use:   "leve [-c conf-dir]",
 		Short: "Command line tool to save RSS articles as email.",
 		Run:   run,
 	}
 )
 
+func defaultConfigDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		panic(err)
+	}
+	return filepath.Join(home, ".leve")
+}
 func init() {
 	cmd.Flags().SortFlags = false
 	cmd.PersistentFlags().SortFlags = false
-	feedsFile = cmd.PersistentFlags().StringP(
-		"feeds",
-		"f",
-		"feeds.txt",
-		"feeds list file",
+	configDir = cmd.PersistentFlags().StringP(
+		"config-dir",
+		"c",
+		defaultConfigDir(),
+		"config directory",
 	)
 	cmd.PersistentFlags().BoolVarP(
 		&flagVerbose,
@@ -66,14 +75,26 @@ func run(c *cobra.Command, args []string) {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
-	// create temp dir
-	err := os.MkdirAll(tempDir, 0777)
+	logrus.Infof("config dir is %s", *configDir)
+	{
+		err := os.MkdirAll(*configDir, 0766)
+		if err != nil {
+			logrus.WithError(err).Fatalf("can not create config dir")
+			return
+		}
+		cacheDir = filepath.Join(*configDir, cacheDir)
+		feedsFile = filepath.Join(*configDir, feedsFile)
+		recordFile = filepath.Join(*configDir, recordFile)
+	}
+
+	// create cache dir
+	err := os.MkdirAll(cacheDir, 0766)
 	if err != nil {
-		logrus.WithError(err).Fatalf("can not create temp directory")
+		logrus.WithError(err).Fatalf("can not create cache dir")
 		return
 	}
 
-	// parse records
+	// parse records.txt
 	file, err := os.Open(recordFile)
 	if err == nil {
 		sc := bufio.NewScanner(file)
@@ -94,7 +115,10 @@ func run(c *cobra.Command, args []string) {
 	}
 
 	// parse feeds
-	file, err = os.Open(*feedsFile)
+	file, err = os.OpenFile(feedsFile, os.O_RDONLY, 0766)
+	if errors.Is(err, os.ErrNotExist) {
+		file, err = os.Create(feedsFile)
+	}
 	if err == nil {
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
@@ -109,8 +133,16 @@ func run(c *cobra.Command, args []string) {
 	}
 	if err != nil {
 		logrus.WithError(err).Fatalf("parse %s failed", feedsFile)
+		return
 	}
 
+	if len(feedList) == 0 {
+		logrus.Errorf("no feed found")
+		logrus.Infof("put your feed urls in %s", feedsFile)
+		return
+	}
+
+	// process
 	for _, feed := range feedList {
 		log := logrus.WithField("feed", feed)
 
@@ -148,7 +180,7 @@ func run(c *cobra.Command, args []string) {
 
 	// remove outdated temp files
 	keepPoint := time.Now().Add(-time.Hour * 24 * 7)
-	filepath.Walk(tempDir, func(path string, info fs.FileInfo, err error) error {
+	filepath.Walk(cacheDir, func(path string, info fs.FileInfo, err error) error {
 		outdated := info.ModTime().Before(keepPoint)
 		if outdated {
 			logrus.Debugf("removed outdated temp file %s", path)

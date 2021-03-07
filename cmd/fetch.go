@@ -33,7 +33,7 @@ func fetchArticle(article *gofeed.Item) (map[string]string, error) {
 
 	var group errgroup.Group
 	for _, src := range parseSources(article.Content) {
-		target := filepath.Join(tempDir, fmt.Sprintf("%s%s", md5str(src), filepath.Ext(src)))
+		target := filepath.Join(cacheDir, fmt.Sprintf("%s%s", md5str(src), filepath.Ext(src)))
 
 		saves[src] = target
 
