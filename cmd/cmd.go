@@ -67,7 +67,7 @@ func init() {
 		//NoColors:        true,
 		HideKeys:    true,
 		CallerFirst: true,
-		FieldsOrder: []string{"feed", "article", "source"},
+		FieldsOrder: []string{"feed", "article", "link", "file"},
 	})
 }
 func run(c *cobra.Command, args []string) {
