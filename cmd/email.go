@@ -15,7 +15,7 @@ import (
 func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, err error) {
 	eml := email.NewEmail()
 
-	var replaces []string
+	replaces := make(map[string]string)
 	for src, localFile := range saves {
 		file, err := os.Open(localFile)
 		if err != nil {
@@ -32,12 +32,14 @@ func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, 
 		}
 
 		attach.HTMLRelated = true
-		replaces = append(replaces, fmt.Sprintf(` src="%s"`, src), fmt.Sprintf(` src="cid:%s"`, contentId))
+
+		replaces[src] = fmt.Sprintf(`cid:%s`, contentId)
 	}
-	replacer := strings.NewReplacer(replaces...)
-	html := cleanHTML(article.Content)
-	html = replacer.Replace(html)
-	html = html + footer(article)
+
+	html, err := processHTML(article.Content, footer(article), replaces)
+	if err != nil {
+		return
+	}
 
 	eml.Subject = article.Title
 	eml.HTML = []byte(html)

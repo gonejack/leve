@@ -3,6 +3,7 @@ module github.com/gonejack/leve
 go 1.15
 
 require (
+	github.com/PuerkitoBio/goquery v1.5.1
 	github.com/antonfisher/nested-logrus-formatter v1.3.0
 	github.com/dustin/go-humanize v1.0.0
 	github.com/google/uuid v1.2.0

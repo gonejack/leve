@@ -1,10 +1,12 @@
 package cmd
 
 import (
-	"github.com/mmcdole/gofeed"
+	"fmt"
 	"net/url"
-	"regexp"
 	"strings"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/mmcdole/gofeed"
 )
 
 func articleFixes(article *gofeed.Item) *gofeed.Item {
@@ -30,24 +32,30 @@ func srcFixes(article *gofeed.Item, src string) string {
 	return src
 }
 
-func cleanHTML(html string) (cleaned string) {
-	cleaned = html
-	cleaned = removeImageAttrs(cleaned)
-	cleaned = removeIframe(cleaned)
-	return
-}
+func processHTML(html string, footer string, replaces map[string]string) (output string, err error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		return
+	}
 
-var srcsetRegExp = regexp.MustCompile(` srcset="[^"]*?"`)
-var loadingRegExp = regexp.MustCompile(` loading="[^"]*?"`)
+	doc.Find("img").Each(func(i int, selection *goquery.Selection) {
+		src, _ := selection.Attr("src")
+		if src != "" && replaces[src] != "" {
+			selection.SetAttr("src", replaces[src])
+		}
+		selection.RemoveAttr("loading")
+		selection.RemoveAttr("srcset")
+	})
+	doc.Find("iframe").Each(func(i int, selection *goquery.Selection) {
+		src, _ := selection.Attr("src")
+		if src != "" {
+			selection.ReplaceWithHtml(fmt.Sprintf("<a src=%s>%s</a>", src, src))
+		}
+	})
+	doc.Find("script").Each(func(i int, selection *goquery.Selection) {
+		selection.Remove()
+	})
+	doc.Find("body").AppendHtml(footer)
 
-func removeImageAttrs(html string) (cleaned string) {
-	cleaned = srcsetRegExp.ReplaceAllLiteralString(html, "")
-	cleaned = loadingRegExp.ReplaceAllLiteralString(cleaned, "")
-	return
-}
-
-var iframeRegExp = regexp.MustCompile(`<iframe.+?src="([^"]+)"[^>]*?>.*?(</iframe>)?`)
-
-func removeIframe(html string) (cleaned string) {
-	return iframeRegExp.ReplaceAllString(html, "<a src=$1>$1</a>")
+	return doc.Html()
 }
