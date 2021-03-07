@@ -7,17 +7,17 @@ Command line tool to save RSS articles as .eml files.
 > go get github.com/gonejack/leve
 ```
 
-### Config
-Put your feed urls inside `~/.leve/feeds.txt`.
-```shell
-> leve -v
-> vi ~/.leve/feeds.txt
-```
-
 ### Usage
 
 ```shell
-> leve [-c ~/.leve]
+> leve [-c ~/.leve] [urls...]
+```
+
+### Config
+To avoid passing urls everytime, put your feed urls inside `~/.leve/feeds.txt`
+```shell
+> leve -v
+> vi ~/.leve/feeds.txt
 ```
 
 ### Files

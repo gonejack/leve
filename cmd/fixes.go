@@ -8,6 +8,9 @@ import (
 )
 
 func articleFixes(article *gofeed.Item) *gofeed.Item {
+	if article.GUID == "" {
+		article.GUID = article.Link
+	}
 	if article.Content == "" {
 		article.Content = article.Description
 	}

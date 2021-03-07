@@ -33,7 +33,7 @@ var (
 	flagVerbose = false
 
 	cmd = &cobra.Command{
-		Use:   "leve [-c conf-dir]",
+		Use:   "leve [-c conf-dir] [feed urls...]",
 		Short: "Command line tool to save RSS articles as .eml files.",
 		Run:   run,
 	}
@@ -115,30 +115,34 @@ func run(c *cobra.Command, args []string) {
 	}
 
 	// parse feeds
-	file, err = os.OpenFile(feedsFile, os.O_RDONLY, 0766)
-	if errors.Is(err, os.ErrNotExist) {
-		file, err = os.Create(feedsFile)
-	}
-	if err == nil {
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			feed := strings.TrimSpace(scanner.Text())
-			if feed == "" || strings.HasPrefix(feed, "//") {
-				continue
-			}
-			feedList = append(feedList, feed)
+	if len(args) > 0 {
+		feedList = args
+	} else {
+		file, err = os.OpenFile(feedsFile, os.O_RDONLY, 0766)
+		if errors.Is(err, os.ErrNotExist) {
+			file, err = os.Create(feedsFile)
 		}
-		err = scanner.Err()
-		_ = file.Close()
-	}
-	if err != nil {
-		logrus.WithError(err).Fatalf("parse %s failed", feedsFile)
-		return
+		if err == nil {
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				feed := strings.TrimSpace(scanner.Text())
+				if feed == "" || strings.HasPrefix(feed, "//") {
+					continue
+				}
+				feedList = append(feedList, feed)
+			}
+			err = scanner.Err()
+			_ = file.Close()
+		}
+		if err != nil {
+			logrus.WithError(err).Fatalf("parse %s failed", feedsFile)
+			return
+		}
 	}
 
 	if len(feedList) == 0 {
-		logrus.Errorf("no feed found")
-		logrus.Infof("put your feed urls in %s", feedsFile)
+		logrus.Errorf("no feeds")
+		logrus.Infof("pass urls or put feed urls in %s", feedsFile)
 		return
 	}
 
@@ -160,7 +164,7 @@ func run(c *cobra.Command, args []string) {
 		}
 	}
 
-	// write records
+	// write records.txt
 	file, err = os.OpenFile(recordFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 	if err == nil {
 		if len(recordList) > recordMax {
@@ -179,9 +183,9 @@ func run(c *cobra.Command, args []string) {
 	}
 
 	// remove outdated temp files
-	keepPoint := time.Now().Add(-time.Hour * 24 * 7)
+	toKeep := time.Now().Add(-time.Hour * 24 * 7)
 	filepath.Walk(cacheDir, func(path string, info fs.FileInfo, err error) error {
-		outdated := info.ModTime().Before(keepPoint)
+		outdated := info.ModTime().Before(toKeep)
 		if outdated {
 			logrus.Debugf("removed outdated temp file %s", path)
 			err := os.Remove(path)
@@ -196,13 +200,13 @@ func process(feed *gofeed.Feed) (emails []string, err error) {
 	log := logrus.WithField("feed", feed.Title)
 
 	for _, article := range feed.Items {
+		article = articleFixes(article)
+
 		log := log.WithFields(logrus.Fields{
 			"feed":    feed.Title,
 			"article": article.Title,
 			"guid":    article.GUID,
 		})
-
-		article = articleFixes(article)
 
 		contentLen, exist := recordMap[article.GUID]
 		if exist {
