@@ -22,10 +22,20 @@ func fixArticle(article *gofeed.Item) *gofeed.Item {
 func fixURL(article *gofeed.Item, src string) string {
 	if !strings.HasPrefix(src, "http") {
 		u, err := url.Parse(article.Link)
-		if err == nil {
-			u.Path = src
-			src = u.String()
+		if err != nil {
+			return src
 		}
+		su, err := url.Parse(src)
+		if err != nil {
+			return src
+		}
+		if su.Host == "" {
+			su.Host = u.Host
+		}
+		if su.Scheme == "" {
+			su.Scheme = u.Scheme
+		}
+		return su.String()
 	}
 
 	return src

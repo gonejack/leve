@@ -183,14 +183,14 @@ func run(c *cobra.Command, args []string) {
 	}
 
 	// remove outdated temp files
-	toKeep := time.Now().Add(-time.Hour * 24 * 7)
+	outdate := time.Now().Add(-time.Hour * 24 * 7)
 	filepath.Walk(cacheDir, func(path string, info fs.FileInfo, err error) error {
-		outdated := info.ModTime().Before(toKeep)
+		outdated := info.ModTime().Before(outdate)
 		if outdated {
-			logrus.Debugf("removed outdated temp file %s", path)
+			logrus.Debugf("remove outdated cache file %s", path)
 			err := os.Remove(path)
 			if err != nil {
-				logrus.WithError(err).Errorf("cannot remove outdated temp file %s", path)
+				logrus.WithError(err).Errorf("cannot remove outdated cache file %s", path)
 			}
 		}
 		return nil
