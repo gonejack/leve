@@ -25,6 +25,8 @@ var (
 	recordMax  = 2000
 
 	configDir *string // default ~/.leve
+	from      *string
+	to        *string
 
 	feedList   []string
 	recordList []string
@@ -54,6 +56,18 @@ func init() {
 		"c",
 		defaultConfigDir(),
 		"config directory",
+	)
+	from = cmd.PersistentFlags().StringP(
+		"from",
+		"",
+		"",
+		"from address",
+	)
+	to = cmd.PersistentFlags().StringP(
+		"to",
+		"",
+		"",
+		"to address",
 	)
 	cmd.PersistentFlags().BoolVarP(
 		&flagVerbose,

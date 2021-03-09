@@ -45,6 +45,10 @@ func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, 
 		return
 	}
 
+	if *to != "" {
+		eml.To = append(eml.To, *to)
+	}
+	eml.From = *from
 	eml.Subject = article.Title
 	eml.HTML = []byte(html)
 
