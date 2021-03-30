@@ -2,6 +2,10 @@
 
 Command line tool to save RSS articles as .eml files.
 
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/gonejack/leve)
+![Build](https://github.com/gonejack/leve/actions/workflows/go.yml/badge.svg)
+[![GitHub license](https://img.shields.io/github/license/gonejack/leve.svg?color=blue)](LICENSE)
+
 ### Install
 ```shell
 > go get github.com/gonejack/leve
