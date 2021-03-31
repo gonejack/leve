@@ -40,8 +40,8 @@ func fixURL(article *gofeed.Item, src string) string {
 
 	return src
 }
-func fixHTML(html string, replaces map[string]string, footer string) (output string, err error) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+func fixHTML(htm string, replaces map[string]string, footer string) (output string, err error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htm))
 	if err != nil {
 		return
 	}
@@ -57,7 +57,7 @@ func fixHTML(html string, replaces map[string]string, footer string) (output str
 	doc.Find("iframe").Each(func(i int, selection *goquery.Selection) {
 		src, _ := selection.Attr("src")
 		if src != "" {
-			selection.ReplaceWithHtml(fmt.Sprintf("<a src=%s>%s</a>", src, src))
+			selection.ReplaceWithHtml(fmt.Sprintf(`<a href="%s">%s</a>`, src, src))
 		}
 	})
 	doc.Find("script").Each(func(i int, selection *goquery.Selection) {
