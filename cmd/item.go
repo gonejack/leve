@@ -47,7 +47,7 @@ func (o *leveItem) fixReference(ref string) string {
 	}
 	return srcu.String()
 }
-func (o *leveItem) renderHTML(replaces map[string]string, footer string) (output string, err error) {
+func (o *leveItem) renderHTML(cids map[string]string) (output string, err error) {
 	htm := o.Item.Content
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htm))
@@ -57,8 +57,8 @@ func (o *leveItem) renderHTML(replaces map[string]string, footer string) (output
 
 	doc.Find("img").Each(func(i int, selection *goquery.Selection) {
 		src, _ := selection.Attr("src")
-		if src != "" && replaces[src] != "" {
-			selection.SetAttr("src", replaces[src])
+		if src != "" && cids[src] != "" {
+			selection.SetAttr("src", cids[src])
 		}
 		selection.RemoveAttr("loading")
 		selection.RemoveAttr("srcset")
@@ -72,9 +72,24 @@ func (o *leveItem) renderHTML(replaces map[string]string, footer string) (output
 	doc.Find("script").Each(func(i int, selection *goquery.Selection) {
 		selection.Remove()
 	})
-	doc.Find("body").AppendHtml(footer)
+	doc.Find("body").AppendHtml(o.footer())
 
 	return doc.Html()
+}
+
+func (o *leveItem) footer() string {
+	const footerTPL = `<br><br>
+<a style="display: block; display:inline-block; border-top: 1px solid #ccc; padding-top: 5px; color: #666; text-decoration: none;"
+   href="${href}"
+>${href}</a>
+<p style="color:#999;">
+Sent with <a style="color:#666; text-decoration:none; font-weight: bold;" href="https://github.com/gonejack/leve">LEVE</a>
+</p>`
+
+	return strings.NewReplacer(
+		"${href}", o.Link,
+		"${pub_time}", o.PublishedParsed.Format("2006-01-02 15:04:05"),
+	).Replace(footerTPL)
 }
 
 func newLeveItem(item *gofeed.Item) *leveItem {

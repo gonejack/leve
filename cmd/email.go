@@ -8,14 +8,13 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
 	"github.com/jordan-wright/email"
-	"github.com/mmcdole/gofeed"
 )
 
 func saveEmail(item *leveItem, saves map[string]string) (filename string, err error) {
 	eml := email.NewEmail()
 
-	replaces := make(map[string]string)
-	for src, localFile := range saves {
+	cids := make(map[string]string)
+	for remoteRef, localFile := range saves {
 		mime, err := mimetype.DetectFile(localFile)
 		if err != nil {
 			return "", err
@@ -37,10 +36,10 @@ func saveEmail(item *leveItem, saves map[string]string) (filename string, err er
 
 		attach.HTMLRelated = true
 
-		replaces[src] = fmt.Sprintf(`cid:%s`, contentId)
+		cids[remoteRef] = fmt.Sprintf(`cid:%s`, contentId)
 	}
 
-	html, err := item.renderHTML(replaces, footer(item.Item))
+	html, err := item.renderHTML(cids)
 	if err != nil {
 		return
 	}
@@ -92,19 +91,4 @@ func escapeFileName(name string) string {
 }
 func randomContentID() string {
 	return strings.ToUpper(uuid.New().String())
-}
-
-var footerTPL = `<br><br>
-<a style="display: block; display:inline-block; border-top: 1px solid #ccc; padding-top: 5px; color: #666; text-decoration: none;"
-   href="${href}"
->${href}</a>
-<p style="color:#999;">
-Sent with <a style="color:#666; text-decoration:none; font-weight: bold;" href="https://github.com/gonejack/leve">LEVE</a>
-</p>`
-
-func footer(article *gofeed.Item) string {
-	return strings.NewReplacer(
-		"${href}", article.Link,
-		"${pub_time}", article.PublishedParsed.Format("2006-01-02 15:04:05"),
-	).Replace(footerTPL)
 }
