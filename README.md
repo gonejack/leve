@@ -26,4 +26,3 @@ To avoid passing urls everytime, put your feed urls inside `~/.leve/feeds.txt`
 
 ### Files
 - Images would be saved into dir `~/.leve/cache`
-- Article records would be saved into `~/.leve/records.txt`
