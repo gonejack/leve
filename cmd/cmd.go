@@ -236,7 +236,7 @@ func process(feed *gofeed.Feed) (err error) {
 		}
 
 		log.Debugf("fetch")
-		res, err := fetchResource(item)
+		downloads, err := fetchResource(item)
 		{
 			if err != nil {
 				log.WithError(err).Errorf("fetch resource failed")
@@ -247,7 +247,7 @@ func process(feed *gofeed.Feed) (err error) {
 
 		log.Debugf("save")
 		{
-			email, err := saveEmail(item, res)
+			email, err := item.saveEmail(downloads)
 			if err == nil {
 				log.Infof("saved as %s", email)
 			} else {
