@@ -26,7 +26,7 @@ func saveEmail(item *leveItem, saves map[string]string) (filename string, err er
 			return "", err
 		}
 
-		contentId := generateContentID()
+		contentId := randomContentID()
 		attach, attachErr := eml.Attach(file, contentId, mime.String())
 
 		_ = file.Close()
@@ -90,7 +90,7 @@ var filenameEscape = strings.NewReplacer(
 func escapeFileName(name string) string {
 	return filenameEscape.Replace(name)
 }
-func generateContentID() string {
+func randomContentID() string {
 	return strings.ToUpper(uuid.New().String())
 }
 

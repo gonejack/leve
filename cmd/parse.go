@@ -6,15 +6,15 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-func parseSources(html string) (list []string) {
-	list, err := parseSourceByGoQuery(html)
+func parseResources(html string) (list []string) {
+	list, err := parseReferenceByGoQuery(html)
 	if err == nil {
 		return
 	}
 	return
 }
 
-func parseSourceByGoQuery(html string) (list []string, err error) {
+func parseReferenceByGoQuery(html string) (list []string, err error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
 		return

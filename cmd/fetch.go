@@ -32,10 +32,15 @@ func fetchResource(item *leveItem) (map[string]string, error) {
 	logrus.Debugf("download start")
 
 	var group errgroup.Group
-	for _, src := range parseSources(item.Content) {
+	for _, src := range parseResources(item.Content) {
+		_, exist := localFiles[src]
+		if exist {
+			continue
+		}
+
 		localFiles[src] = filepath.Join(cacheDir, fmt.Sprintf("%s%s", md5str(src), filepath.Ext(src)))
 
-		link := item.fixElementRef(src)
+		link := item.fixReference(src)
 		func(link string, file string, log *logrus.Entry) {
 			group.Go(func() error {
 				dlLock.Acquire(context.TODO(), 1)
@@ -45,6 +50,7 @@ func fetchResource(item *leveItem) (map[string]string, error) {
 				if err != nil {
 					log.WithError(err).Error("download failed")
 				}
+
 				return err
 			})
 		}(link, localFiles[src], logrus.WithFields(logrus.Fields{"link": link, "file": localFiles[src]}))

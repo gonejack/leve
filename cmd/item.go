@@ -26,7 +26,7 @@ func (o *leveItem) fixContent() {
 		o.Item.Content = o.Item.Description
 	}
 }
-func (o *leveItem) fixElementRef(ref string) string {
+func (o *leveItem) fixReference(ref string) string {
 	if strings.HasPrefix(ref, "http") {
 		return ref
 	}
