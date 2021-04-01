@@ -11,7 +11,7 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
-func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, err error) {
+func saveEmail(item *leveItem, saves map[string]string) (filename string, err error) {
 	eml := email.NewEmail()
 
 	replaces := make(map[string]string)
@@ -40,7 +40,7 @@ func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, 
 		replaces[src] = fmt.Sprintf(`cid:%s`, contentId)
 	}
 
-	html, err := fixHTML(article.Content, replaces, footer(article))
+	html, err := item.renderHTML(replaces, footer(item.Item))
 	if err != nil {
 		return
 	}
@@ -49,7 +49,7 @@ func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, 
 		eml.To = append(eml.To, *to)
 	}
 	eml.From = *from
-	eml.Subject = article.Title
+	eml.Subject = item.Title
 	eml.HTML = []byte(html)
 
 	data, err := eml.Bytes()
@@ -58,7 +58,7 @@ func saveEmail(article *gofeed.Item, saves map[string]string) (filename string, 
 	}
 
 	extension := "eml"
-	basename := escapeFileName(article.Title)
+	basename := escapeFileName(item.Title)
 	filename = fmt.Sprintf("%s.%s", basename, extension)
 
 	var file *os.File

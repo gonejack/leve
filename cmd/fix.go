@@ -9,38 +9,47 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
-func fixArticle(article *gofeed.Item) *gofeed.Item {
-	if article.GUID == "" {
-		article.GUID = article.Link
+type leveItem struct {
+	*gofeed.Item
+}
+
+func (o *leveItem) key() string {
+	return md5str(fmt.Sprintf("%s.%d", o.GUID, len(o.Content)))
+}
+func (o *leveItem) fixUUID() {
+	if o.Item.GUID == "" {
+		o.Item.GUID = o.Item.Link
 	}
-	if article.Content == "" {
-		article.Content = article.Description
+}
+func (o *leveItem) fixContent() {
+	if o.Item.Content == "" {
+		o.Item.Content = o.Item.Description
+	}
+}
+func (o *leveItem) fixElementRef(ref string) string {
+	if strings.HasPrefix(ref, "http") {
+		return ref
 	}
 
-	return article
-}
-func fixURL(article *gofeed.Item, src string) string {
-	if !strings.HasPrefix(src, "http") {
-		u, err := url.Parse(article.Link)
-		if err != nil {
-			return src
-		}
-		su, err := url.Parse(src)
-		if err != nil {
-			return src
-		}
-		if su.Host == "" {
-			su.Host = u.Host
-		}
-		if su.Scheme == "" {
-			su.Scheme = u.Scheme
-		}
-		return su.String()
+	u, err := url.Parse(o.Item.Link)
+	if err != nil {
+		return ref
 	}
-
-	return src
+	srcu, err := url.Parse(ref)
+	if err != nil {
+		return ref
+	}
+	if srcu.Host == "" {
+		srcu.Host = u.Host
+	}
+	if srcu.Scheme == "" {
+		srcu.Scheme = u.Scheme
+	}
+	return srcu.String()
 }
-func fixHTML(htm string, replaces map[string]string, footer string) (output string, err error) {
+func (o *leveItem) renderHTML(replaces map[string]string, footer string) (output string, err error) {
+	htm := o.Item.Content
+
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htm))
 	if err != nil {
 		return
@@ -66,4 +75,12 @@ func fixHTML(htm string, replaces map[string]string, footer string) (output stri
 	doc.Find("body").AppendHtml(footer)
 
 	return doc.Html()
+}
+
+func newLeveItem(item *gofeed.Item) *leveItem {
+	it := &leveItem{Item: item}
+	it.fixUUID()
+	it.fixContent()
+
+	return it
 }

@@ -26,18 +26,16 @@ func fetchFeed(url string) (*gofeed.Feed, error) {
 	defer cancel()
 	return gofeed.NewParser().ParseURLWithContext(url, timeout)
 }
-func fetchArticle(article *gofeed.Item) (map[string]string, error) {
-	saves := make(map[string]string)
+func fetchResource(item *leveItem) (map[string]string, error) {
+	localFiles := make(map[string]string)
 
 	logrus.Debugf("download start")
 
 	var group errgroup.Group
-	for _, src := range parseSources(article.Content) {
-		target := filepath.Join(cacheDir, fmt.Sprintf("%s%s", md5str(src), filepath.Ext(src)))
+	for _, src := range parseSources(item.Content) {
+		localFiles[src] = filepath.Join(cacheDir, fmt.Sprintf("%s%s", md5str(src), filepath.Ext(src)))
 
-		saves[src] = target
-
-		link := fixURL(article, src)
+		link := item.fixElementRef(src)
 		func(link string, file string, log *logrus.Entry) {
 			group.Go(func() error {
 				dlLock.Acquire(context.TODO(), 1)
@@ -49,16 +47,14 @@ func fetchArticle(article *gofeed.Item) (map[string]string, error) {
 				}
 				return err
 			})
-		}(link, target, logrus.WithFields(logrus.Fields{
-			"link": link,
-			"file": target,
-		}))
+		}(link, localFiles[src], logrus.WithFields(logrus.Fields{"link": link, "file": localFiles[src]}))
 	}
 
 	err := group.Wait()
 	if err == nil {
 		logrus.Debugf("download finish")
-		return saves, nil
+
+		return localFiles, nil
 	} else {
 		return nil, err
 	}
@@ -102,7 +98,7 @@ func download(path string, src string, log *logrus.Entry) (err error) {
 	defer file.Close()
 
 	var written int64
-	if flagVerbose {
+	if verbose {
 		bar := progressbar.NewOptions64(resp.ContentLength,
 			progressbar.OptionSetTheme(progressbar.Theme{Saucer: "=", SaucerPadding: ".", BarStart: "|", BarEnd: "|"}),
 			progressbar.OptionSetWidth(10),

@@ -3,11 +3,10 @@ package cmd
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strconv"
+	"regexp"
 	"strings"
 	"time"
 
@@ -18,21 +17,20 @@ import (
 )
 
 var (
-	cacheDir   = "cache"
-	feedsFile  = "feeds.txt"
-	recordFile = "records.txt"
-	recordSep  = "#record#"
-	recordMax  = 2000
+	confDir   *string // default ~/.leve
+	cacheDir  = "cache"
+	seenDir   = "seen"
+	feedTxt   = "feeds.txt"
+	hexRegexp = regexp.MustCompile("^[0-9a-z]+$")
 
-	configDir *string // default ~/.leve
-	from      *string
-	to        *string
+	from *string
+	to   *string
 
-	feedList   []string
-	recordList []string
-	recordMap  = make(map[string]int)
+	feeds   []string
+	newSeen []string
+	seenMap = make(map[string]bool)
 
-	flagVerbose = false
+	verbose = false
 
 	cmd = &cobra.Command{
 		Use:   "leve [-c conf-dir] [feed urls...]",
@@ -51,7 +49,7 @@ func defaultConfigDir() string {
 func init() {
 	cmd.Flags().SortFlags = false
 	cmd.PersistentFlags().SortFlags = false
-	configDir = cmd.PersistentFlags().StringP(
+	confDir = cmd.PersistentFlags().StringP(
 		"config-dir",
 		"c",
 		defaultConfigDir(),
@@ -70,7 +68,7 @@ func init() {
 		"to address",
 	)
 	cmd.PersistentFlags().BoolVarP(
-		&flagVerbose,
+		&verbose,
 		"verbose",
 		"v",
 		false,
@@ -85,20 +83,20 @@ func init() {
 	})
 }
 func run(c *cobra.Command, args []string) {
-	if flagVerbose {
+	if verbose {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
-	logrus.Infof("config dir is %s", *configDir)
+	logrus.Infof("config dir is %s", *confDir)
 	{
-		err := os.MkdirAll(*configDir, 0766)
+		err := os.MkdirAll(*confDir, 0766)
 		if err != nil {
 			logrus.WithError(err).Fatalf("can not create config dir")
 			return
 		}
-		cacheDir = filepath.Join(*configDir, cacheDir)
-		feedsFile = filepath.Join(*configDir, feedsFile)
-		recordFile = filepath.Join(*configDir, recordFile)
+		cacheDir = filepath.Join(*confDir, cacheDir)
+		seenDir = filepath.Join(*confDir, seenDir)
+		feedTxt = filepath.Join(*confDir, feedTxt)
 	}
 
 	// create cache dir
@@ -109,98 +107,107 @@ func run(c *cobra.Command, args []string) {
 	}
 
 	// parse records.txt
-	file, err := os.Open(recordFile)
-	if err == nil {
-		sc := bufio.NewScanner(file)
-		for sc.Scan() {
-			row := strings.TrimSpace(sc.Text())
-			pair := strings.Split(row, recordSep)
-			if len(pair) == 2 {
-				guid, contentLen := pair[0], pair[1]
-				recordMap[guid], _ = strconv.Atoi(contentLen)
-				recordList = append(recordList, row)
+	err = os.MkdirAll(seenDir, 0766)
+	if err != nil {
+		logrus.WithError(err).Fatalf("can not create seen dir")
+		return
+	}
+
+	err = filepath.Walk(seenDir, func(path string, info fs.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+
+		if info.Size() == 0 && hexRegexp.MatchString(info.Name()) {
+			duration := time.Since(info.ModTime())
+
+			if duration > time.Hour*24*4 {
+				e := os.Remove(path)
+				if e != nil {
+					return e
+				}
+			} else {
+				seenMap[info.Name()] = true
 			}
 		}
-		err = sc.Err()
-		_ = file.Close()
-		if err != nil {
-			logrus.WithError(err).Fatalf("parse %s failed", recordFile)
-		}
+
+		return nil
+	})
+	if err != nil {
+		logrus.WithError(err).Fatalf("can not remove outdated seen items")
+		return
 	}
 
 	// parse feeds
 	if len(args) > 0 {
-		feedList = args
+		feeds = args
 	} else {
-		file, err = os.OpenFile(feedsFile, os.O_RDONLY, 0766)
+		file, err := os.OpenFile(feedTxt, os.O_RDONLY, 0766)
 		if errors.Is(err, os.ErrNotExist) {
-			file, err = os.Create(feedsFile)
+			file, err = os.Create(feedTxt)
 		}
 		if err == nil {
 			scanner := bufio.NewScanner(file)
 			for scanner.Scan() {
 				feed := strings.TrimSpace(scanner.Text())
-				if feed == "" || strings.HasPrefix(feed, "//") {
+
+				switch {
+				case feed == "":
+					continue
+				case strings.HasPrefix(feed, "//"):
+					continue
+				case strings.HasPrefix(feed, "#"):
 					continue
 				}
-				feedList = append(feedList, feed)
+
+				feeds = append(feeds, feed)
 			}
 			err = scanner.Err()
 			_ = file.Close()
 		}
 		if err != nil {
-			logrus.WithError(err).Fatalf("parse %s failed", feedsFile)
+			logrus.WithError(err).Fatalf("parse %s failed", feedTxt)
 			return
 		}
 	}
 
-	if len(feedList) == 0 {
-		logrus.Errorf("no feeds")
-		logrus.Infof("pass urls or put feed urls in %s", feedsFile)
+	if len(feeds) == 0 {
+		logrus.Errorf("no feeds given")
+		logrus.Infof("pass urls or put feed urls in %s", feedTxt)
 		return
 	}
 
 	// process
-	for _, feed := range feedList {
-		log := logrus.WithField("feed", feed)
+	for _, feedURL := range feeds {
+		log := logrus.WithField("feed", feedURL)
 
 		log.Debugf("feed fetch")
-		fd, err := fetchFeed(feed)
+		feed, err := fetchFeed(feedURL)
 		if err != nil {
 			log.WithError(err).Errorf("fetch failed")
 			continue
 		}
 
 		log.Debugf("feed process")
-		_, err = process(fd)
+		err = process(feed)
 		if err != nil {
-			logrus.WithError(err).Errorf("process feed %s error", feed)
+			logrus.WithError(err).Errorf("process feed %s error", feed.Title)
 		}
 	}
 
-	// write records.txt
-	file, err = os.OpenFile(recordFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
-	if err == nil {
-		if len(recordList) > recordMax {
-			recordList = recordList[len(recordList)-recordMax:]
+	// write
+	for _, seen := range newSeen {
+		f, err := os.Create(filepath.Join(seenDir, seen))
+		if err != nil {
+			logrus.WithError(err).Fatalf("write %s failed", seen)
+			return
 		}
-		for _, record := range recordList {
-			_, err = fmt.Fprintln(file, record)
-			if err != nil {
-				break
-			}
-		}
-		_ = file.Close()
-	}
-	if err != nil {
-		logrus.WithError(err).Fatalf("write %s failed", recordFile)
+		_ = f.Close()
 	}
 
 	// remove outdated temp files
-	outdate := time.Now().Add(-time.Hour * 24 * 7)
 	filepath.Walk(cacheDir, func(path string, info fs.FileInfo, err error) error {
-		outdated := info.ModTime().Before(outdate)
-		if outdated {
+		if time.Since(info.ModTime()) > time.Hour*24*7 {
 			logrus.Debugf("remove outdated cache file %s", path)
 			err := os.Remove(path)
 			if err != nil {
@@ -210,54 +217,51 @@ func run(c *cobra.Command, args []string) {
 		return nil
 	})
 }
-func process(feed *gofeed.Feed) (emails []string, err error) {
+func process(feed *gofeed.Feed) (err error) {
 	log := logrus.WithField("feed", feed.Title)
 
-	for _, article := range feed.Items {
-		article = fixArticle(article)
+	for _, fi := range feed.Items {
+		item := newLeveItem(fi)
+		itemKey := item.key()
 
 		log := log.WithFields(logrus.Fields{
 			"feed":    feed.Title,
-			"article": article.Title,
-			"guid":    article.GUID,
+			"article": item.Title,
+			"key":     itemKey,
 		})
 
-		contentLen, exist := recordMap[article.GUID]
-		if exist {
-			if len(article.Content) == contentLen {
-				log.Debugf("skipped")
-				continue
-			} else {
-				log.Debugf("has update")
-				article.Title += ".update"
-			}
+		if seenMap[itemKey] {
+			log.Debugf("skipped")
+			continue
 		}
 
 		log.Debugf("fetch")
-		saves, err := fetchArticle(article)
-		if err != nil {
-			log.WithError(err).Errorf("fetch resource failed")
-			return nil, err
+		res, err := fetchResource(item)
+		{
+			if err != nil {
+				log.WithError(err).Errorf("fetch resource failed")
+				return err
+			}
+			log.Debugf("fetched")
 		}
-		log.Debugf("fetched")
 
 		log.Debugf("save")
-		email, err := saveEmail(article, saves)
-		if err != nil {
-			log.WithError(err).Error("save email failed")
-			continue
+		{
+			email, err := saveEmail(item, res)
+			if err == nil {
+				log.Infof("saved as %s", email)
+			} else {
+				log.WithError(err).Error("save email failed")
+				continue
+			}
 		}
-		emails = append(emails, email)
-		log.Infof("saved as %s", email)
 
-		record := fmt.Sprintf("%s%s%d", article.GUID, recordSep, len(article.Content))
-		recordList = append(recordList, record)
-		recordMap[article.GUID] = len(article.Content)
+		newSeen = append(newSeen, itemKey)
+		seenMap[itemKey] = true
 	}
 
 	return
 }
-
 func Execute() {
 	err := cmd.Execute()
 	if err != nil {
