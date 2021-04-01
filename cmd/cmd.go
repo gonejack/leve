@@ -181,14 +181,14 @@ func run(c *cobra.Command, args []string) {
 	for _, feedURL := range feeds {
 		log := logrus.WithField("feed", feedURL)
 
-		log.Debugf("feed fetch")
+		log.Debugf("fetching")
 		feed, err := fetchFeed(feedURL)
 		if err != nil {
 			log.WithError(err).Errorf("fetch failed")
 			continue
 		}
 
-		log.Debugf("feed process")
+		log.Debugf("processing")
 		err = process(feed)
 		if err != nil {
 			logrus.WithError(err).Errorf("process feed %s error", feed.Title)
