@@ -8,8 +8,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gabriel-vasile/mimetype"
+	"github.com/gonejack/email"
 	"github.com/google/uuid"
-	"github.com/jordan-wright/email"
 	"github.com/mmcdole/gofeed"
 )
 
